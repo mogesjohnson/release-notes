@@ -17,7 +17,8 @@
   "scripts": {
     "prepare": "node scripts/setup-hooks.mjs",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test build/test/tests/*.test.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
