@@ -1,0 +1,26 @@
+{
+  "name": "release-notes",
+  "version": "0.1.0",
+  "description": "Write CHANGELOG.md and user-facing RELEASE_NOTES.md from merged PRs.",
+  "license": "MIT",
+  "author": "Moges Johnson",
+  "type": "module",
+  "bin": {
+    "release-notes": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "node scripts/setup-hooks.mjs",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
