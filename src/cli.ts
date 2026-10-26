@@ -2,6 +2,7 @@
 import { realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { polishNotes } from './ai.js';
 import { detectRepo, ghAvailable, lastTag, mergedPrs, readCommits } from './git.js';
 import { buildItems, groupItems } from './group.js';
 import { prependChangelog, renderChangelogSection, renderReleaseNotes } from './render.js';
@@ -64,7 +65,8 @@ export async function main(argv: string[]): Promise<number> {
   const now = new Date();
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const section = renderChangelogSection(version, date, groups);
-  const notes = renderReleaseNotes(version, groups);
+  const plain = renderReleaseNotes(version, groups);
+  const notes = o.ai ? await polishNotes(plain, { model: o.model, url: process.env.OLLAMA_URL }) : plain;
   console.error(`release-notes: ${commits.length} commits${from ? ` since ${from}` : ''}, ${prs.size} merged PRs known${repo ? ` (${repo})` : ''}`);
   if (o.dryRun) {
     console.log(`<!-- CHANGELOG.md (new section) -->\n\n${section}\n<!-- RELEASE_NOTES.md -->\n\n${notes}`);
