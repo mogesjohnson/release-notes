@@ -13,27 +13,30 @@ export interface PullRequest {
   url: string;
 }
 
-function run(cmd: string, args: string[], cwd: string): string {
-  return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
-}
+/** Runs a command and returns its stdout. Throws on a non-zero exit. Tests pass a fake. */
+export type Exec = (cmd: string, args: string[], cwd: string) => string;
 
-function tryRun(cmd: string, args: string[], cwd: string): string | undefined {
+export const run: Exec = (cmd, args, cwd) => {
+  return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+};
+
+function tryRun(exec: Exec, cmd: string, args: string[], cwd: string): string | undefined {
   try {
-    return run(cmd, args, cwd);
+    return exec(cmd, args, cwd);
   } catch {
     return undefined;
   }
 }
 
 /** The newest tag reachable from `ref`, or undefined when the repo has no tags. */
-export function lastTag(cwd: string, ref: string): string | undefined {
-  return tryRun('git', ['describe', '--tags', '--abbrev=0', ref], cwd)?.trim() || undefined;
+export function lastTag(cwd: string, ref: string, exec: Exec = run): string | undefined {
+  return tryRun(exec, 'git', ['describe', '--tags', '--abbrev=0', ref], cwd)?.trim() || undefined;
 }
 
 /** Commits in from..to (or all of `to` when `from` is undefined), newest first. */
-export function readCommits(cwd: string, from: string | undefined, to: string): Commit[] {
+export function readCommits(cwd: string, from: string | undefined, to: string, exec: Exec = run): Commit[] {
   const range = from ? `${from}..${to}` : to;
-  const out = run('git', ['log', '--format=%H%x00%P%x00%s%x00%b%x1e', range], cwd);
+  const out = exec('git', ['log', '--format=%H%x00%P%x00%s%x00%b%x1e', range], cwd);
   return out
     .split('\x1e')
     .map((r) => r.replace(/^\n/, ''))
@@ -45,20 +48,20 @@ export function readCommits(cwd: string, from: string | undefined, to: string): 
 }
 
 /** "owner/name" from the origin remote, if it points at GitHub. */
-export function detectRepo(cwd: string): string | undefined {
-  const url = tryRun('git', ['remote', 'get-url', 'origin'], cwd)?.trim();
+export function detectRepo(cwd: string, exec: Exec = run): string | undefined {
+  const url = tryRun(exec, 'git', ['remote', 'get-url', 'origin'], cwd)?.trim();
   const m = url?.match(/github\.com[:/]([^/]+\/[^/]+?)(\.git)?$/);
   return m?.[1];
 }
 
-export function ghAvailable(cwd: string): boolean {
-  return tryRun('gh', ['auth', 'status'], cwd) !== undefined;
+export function ghAvailable(cwd: string, exec: Exec = run): boolean {
+  return tryRun(exec, 'gh', ['auth', 'status'], cwd) !== undefined;
 }
 
 /** Merged PRs keyed by merge commit sha. Empty when gh is missing or the call fails. */
-export function mergedPrs(cwd: string, repo: string, limit = 500): Map<string, PullRequest> {
+export function mergedPrs(cwd: string, repo: string, limit = 500, exec: Exec = run): Map<string, PullRequest> {
   const map = new Map<string, PullRequest>();
-  const out = tryRun('gh', ['pr', 'list', '--repo', repo, '--state', 'merged', '--limit', String(limit), '--json', 'number,title,url,mergeCommit'], cwd);
+  const out = tryRun(exec, 'gh', ['pr', 'list', '--repo', repo, '--state', 'merged', '--limit', String(limit), '--json', 'number,title,url,mergeCommit'], cwd);
   if (!out) return map;
   for (const pr of JSON.parse(out) as Array<PullRequest & { mergeCommit?: { oid: string } }>) {
     if (pr.mergeCommit?.oid) map.set(pr.mergeCommit.oid, { number: pr.number, title: pr.title, url: pr.url });
@@ -67,7 +70,7 @@ export function mergedPrs(cwd: string, repo: string, limit = 500): Map<string, P
 }
 
 /** Shas that a merge commit brought in: everything in first-parent..second-parent. */
-export function mergedShas(cwd: string, merge: Commit): string[] {
+export function mergedShas(cwd: string, merge: Commit, exec: Exec = run): string[] {
   if (merge.parents.length < 2) return [];
-  return tryRun('git', ['rev-list', `${merge.parents[0]}..${merge.parents[1]}`], cwd)?.split('\n').filter(Boolean) ?? [];
+  return tryRun(exec, 'git', ['rev-list', `${merge.parents[0]}..${merge.parents[1]}`], cwd)?.split('\n').filter(Boolean) ?? [];
 }
