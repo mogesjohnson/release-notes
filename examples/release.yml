@@ -1,0 +1,40 @@
+# Example only. Copy to .github/workflows/release.yml in your own repo to use it.
+# On a tag push, write the notes for that tag and publish a GitHub Release with them.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write       # create the release
+  pull-requests: read   # gh pr list, to link merged PRs
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history and tags, so the previous tag is found
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build release-notes
+        run: |
+          git clone --depth 1 https://github.com/mogesjohnson/release-notes "$RUNNER_TEMP/release-notes"
+          cd "$RUNNER_TEMP/release-notes" && npm ci --ignore-scripts && npm run build
+
+      - name: Write notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          node "$RUNNER_TEMP/release-notes/dist/cli.js" --to "$GITHUB_REF_NAME" ${prev:+--from "$prev"} --repo "$GITHUB_REPOSITORY"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md --verify-tag
