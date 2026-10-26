@@ -28,9 +28,16 @@ function tryRun(exec: Exec, cmd: string, args: string[], cwd: string): string | 
   }
 }
 
-/** The newest tag reachable from `ref`, or undefined when the repo has no tags. */
+/**
+ * The newest tag before `ref`, or undefined when there is none. A tag on `ref` itself
+ * is skipped, so `--to v1.1.0` (or a freshly tagged HEAD) starts after the previous tag.
+ */
 export function lastTag(cwd: string, ref: string, exec: Exec = run): string | undefined {
-  return tryRun(exec, 'git', ['describe', '--tags', '--abbrev=0', ref], cwd)?.trim() || undefined;
+  const describe = (r: string) => tryRun(exec, 'git', ['describe', '--tags', '--abbrev=0', r], cwd)?.trim() || undefined;
+  const commitOf = (r: string) => tryRun(exec, 'git', ['rev-parse', '--verify', '--quiet', `${r}^{commit}`], cwd)?.trim();
+  const tag = describe(ref);
+  if (!tag || commitOf(tag) !== commitOf(ref)) return tag;
+  return describe(`${ref}^`);
 }
 
 /** Commits in from..to (or all of `to` when `from` is undefined), newest first. */

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
-import { detectRepo, ghAvailable, lastTag, mergedPrs, mergedShas, readCommits } from '../src/git.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { after, describe, test } from 'node:test';
+import { detectRepo, ghAvailable, lastTag, mergedPrs, mergedShas, readCommits, run } from '../src/git.js';
 import { commit, failingExec, fakeExec, sha } from './helpers.js';
 
 describe('readCommits', () => {
@@ -38,15 +41,60 @@ describe('readCommits', () => {
 });
 
 describe('lastTag', () => {
-  test('returns the trimmed tag from git describe', () => {
-    const exec = fakeExec(() => 'v1.2.0\n');
-    assert.equal(lastTag('/r', 'HEAD', exec), 'v1.2.0');
+  // A fake git with tags v1.0.0 on commit 1 and v1.1.0 on commit 2; HEAD is commit 3.
+  const commits: Record<string, string> = { 'v1.0.0': sha('1'), 'v1.1.0': sha('2'), 'v1.1.0^': sha('1'), HEAD: sha('3'), 'HEAD^': sha('2') };
+  const nearest: Record<string, string> = { [sha('3')]: 'v1.1.0', [sha('2')]: 'v1.1.0', [sha('1')]: 'v1.0.0' };
+  const repo = (tagged = true) => fakeExec(({ args }) => {
+    const ref = args.at(-1)!.replace(/\^\{commit\}$/, '');
+    const c = commits[ref];
+    if (!c) throw new Error(`unknown ref ${ref}`);
+    if (args[0] === 'rev-parse') return `${c}\n`;
+    if (!tagged || !nearest[c]) throw new Error('no names found');
+    return `${nearest[c]}\n`;
+  });
+
+  test('returns the newest tag when `ref` itself is not tagged', () => {
+    const exec = repo();
+    assert.equal(lastTag('/r', 'HEAD', exec), 'v1.1.0');
     assert.deepEqual(exec.calls[0].args, ['describe', '--tags', '--abbrev=0', 'HEAD']);
   });
 
+  test('skips a tag on `ref` itself and returns the one before it', () => {
+    assert.equal(lastTag('/r', 'v1.1.0', repo()), 'v1.0.0');
+  });
+
+  test('is undefined when the only tag is on `ref`', () => {
+    assert.equal(lastTag('/r', 'v1.0.0', repo()), undefined);
+  });
+
   test('is undefined when the repo has no tags', () => {
+    assert.equal(lastTag('/r', 'HEAD', repo(false)), undefined);
     assert.equal(lastTag('/r', 'HEAD', failingExec), undefined);
     assert.equal(lastTag('/r', 'HEAD', fakeExec(() => '\n')), undefined);
+  });
+});
+
+describe('lastTag with real git', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'release-notes-git-'));
+  after(() => rmSync(dir, { recursive: true, force: true }));
+  const git = (...args: string[]) => run('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'tag.gpgSign=false', '-c', 'commit.gpgSign=false', ...args], dir);
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'feat: first');
+  git('tag', 'v1.0.0');
+  git('commit', '-q', '--allow-empty', '-m', 'fix: second');
+  git('tag', 'v1.1.0');
+
+  test('--to a tag reads the commits since the previous tag', () => {
+    assert.equal(lastTag(dir, 'v1.1.0'), 'v1.0.0');
+    assert.deepEqual(readCommits(dir, lastTag(dir, 'v1.1.0'), 'v1.1.0').map((c) => c.subject), ['fix: second']);
+  });
+
+  test('a tagged HEAD also starts after the previous tag', () => {
+    assert.equal(lastTag(dir, 'HEAD'), 'v1.0.0');
+  });
+
+  test('the first tag has no tag before it, so every commit is read', () => {
+    assert.equal(lastTag(dir, 'v1.0.0'), undefined);
   });
 });
 
