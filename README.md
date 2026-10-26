@@ -2,7 +2,7 @@
 
 A small Node + TypeScript CLI that turns the commits and merged PRs since your last tag into two files:
 
-- `CHANGELOG.md`: a new dated section is prepended, grouped by Conventional Commit type. Existing content is never overwritten.
+- `CHANGELOG.md`: a new dated section is prepended, grouped by Conventional Commit type. Existing content is never overwritten. A `!` after the type, or a `BREAKING CHANGE:` footer in the body, marks an entry as breaking.
 - `RELEASE_NOTES.md`: friendlier wording for users, with no `feat:`/`fix:` prefixes or scopes, and maintenance commits left out.
 
 Groups: **New** (feat), **Fixed** (fix), **Changed** (refactor, perf), **Docs** (docs) and **Other**. Each item links to its PR when one is known.

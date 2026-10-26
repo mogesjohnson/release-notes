@@ -28,6 +28,9 @@ export function sectionFor(type: string): Section {
   }
 }
 
+/** A Conventional Commits breaking-change footer: uppercase, at the start of a line. */
+const BREAKING_FOOTER = /^BREAKING[ -]CHANGE: /m;
+
 export function parseSubject(subject: string): Omit<Item, 'sha' | 'pr'> {
   const clean = subject.replace(SQUASH_PR, '').trim();
   const m = clean.match(CONVENTIONAL);
@@ -58,7 +61,7 @@ export function buildItems(cwd: string, commits: Commit[], prs: Map<string, Pull
     const parsed = parseSubject(c.subject);
     const squash = c.subject.match(SQUASH_PR);
     const pr = prs.get(c.sha) ?? owner.get(c.sha) ?? (squash ? { number: Number(squash[1]), title: parsed.description, url: prUrl(repo, Number(squash[1])) } : undefined);
-    items.push({ sha: c.sha, ...parsed, pr });
+    items.push({ sha: c.sha, ...parsed, breaking: parsed.breaking || BREAKING_FOOTER.test(c.body), pr });
   }
   return items;
 }

@@ -170,3 +170,27 @@ describe('buildItems: PR mapping', () => {
     });
   });
 });
+
+describe('buildItems: BREAKING CHANGE footer', () => {
+  const one = (subject: string, body: string) => buildItems('/repo', [commit(sha('a'), subject, { body })], new Map(), undefined, failingExec)[0];
+
+  test('a "BREAKING CHANGE:" footer marks the item breaking', () => {
+    const item = one('feat(cli): read config from a file', 'Adds --config.\n\nBREAKING CHANGE: --cwd is now --dir');
+    assert.equal(item.breaking, true);
+    assert.equal(item.description, 'read config from a file');
+  });
+
+  test('the "BREAKING-CHANGE:" spelling counts too', () => {
+    assert.equal(one('fix: drop node 18', 'BREAKING-CHANGE: node 20 is required').breaking, true);
+  });
+
+  test('a squash body that carries the footer of one of its commits counts', () => {
+    assert.equal(one('feat: new flags (#12)', '* feat: a\n\n* feat: b\n\nBREAKING CHANGE: b renames --x').breaking, true);
+  });
+
+  test('a lowercase footer or a mention mid-line does not count', () => {
+    assert.equal(one('fix: a', 'breaking change: no').breaking, false);
+    assert.equal(one('fix: b', 'This is not a BREAKING CHANGE: just a note.').breaking, false);
+    assert.equal(one('fix: c', '').breaking, false);
+  });
+});
