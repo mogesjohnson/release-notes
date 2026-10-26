@@ -115,7 +115,8 @@ release-notes --from 5bb5db1 --dry-run
 
 ## Development
 
-See [AGENTS.md](AGENTS.md) and [RULES.md](RULES.md). Build with `npm run build` (tsc).
+See [AGENTS.md](AGENTS.md) and [RULES.md](RULES.md). Build with `npm run build` (tsc) and run the unit tests with `npm test`
+(node:test on tsc output; git, gh and Ollama are faked, so no network is needed). CI runs both on every push and PR.
 PRs are merged with a merge commit, never squashed.
 
 ## License

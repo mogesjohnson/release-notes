@@ -17,7 +17,7 @@ Run these from the repo root. They are the only definition of "checks pass".
 
 <!-- REPO-SPECIFIC: replace with the real commands. Delete any that do not exist. -->
 - Install: `npm ci` (also points Git at `.githooks/`)
-- Types and build: `npm run build` (tsc)
+- Types, build, tests: `npm run typecheck`, `npm run build`, `npm test` (node:test via tsc)
 - PR size: `node scripts/check/pr-size.mjs`
 <!-- /REPO-SPECIFIC -->
 
@@ -25,7 +25,7 @@ Run these from the repo root. They are the only definition of "checks pass".
 
 <!-- REPO-SPECIFIC: five to ten lines. Path, then what it holds. No full tree. -->
 - `src/`: the CLI (`cli.ts`), git and gh collection, grouping, writers, Ollama client.
-- `examples/release.yml`: example tag-push workflow. Not active CI.
+- `tests/`: unit tests, git/gh/fetch faked. CI: `.github/workflows/ci.yml`; `examples/release.yml` is not CI.
 - `scripts/`: commit, PR-format, size and secret checks copied from BEST-OF-AI-DEV.
 - `docs/tasks/`, `docs/decisions/`: task specs and ADRs; `0000-template.md` is the blank form.
 <!-- /REPO-SPECIFIC -->

@@ -1,4 +1,4 @@
-import { type Commit, type PullRequest, mergedShas } from './git.js';
+import { type Commit, type Exec, type PullRequest, mergedShas, run } from './git.js';
 
 export type Section = 'New' | 'Fixed' | 'Changed' | 'Docs' | 'Other';
 export const SECTIONS: Section[] = ['New', 'Fixed', 'Changed', 'Docs', 'Other'];
@@ -41,16 +41,16 @@ function prUrl(repo: string | undefined, n: number): string {
 
 /**
  * Turns commits into items linked to PRs. Merge commits are not items: they only
- * tell us which PR the commits they brought in belong to.
+ * tell us which PR the commits they brought in belong to. `exec` runs git (tests pass a fake).
  */
-export function buildItems(cwd: string, commits: Commit[], prs: Map<string, PullRequest>, repo?: string): Item[] {
+export function buildItems(cwd: string, commits: Commit[], prs: Map<string, PullRequest>, repo?: string, exec: Exec = run): Item[] {
   const owner = new Map<string, PullRequest>();
   for (const c of commits) {
     if (c.parents.length < 2) continue;
     const m = c.subject.match(MERGE_PR);
     const pr = prs.get(c.sha) ?? (m ? { number: Number(m[1]), title: c.body.split('\n')[0] || c.subject, url: prUrl(repo, Number(m[1])) } : undefined);
     if (!pr) continue;
-    for (const sha of mergedShas(cwd, c)) if (!owner.has(sha)) owner.set(sha, pr);
+    for (const sha of mergedShas(cwd, c, exec)) if (!owner.has(sha)) owner.set(sha, pr);
   }
   const items: Item[] = [];
   for (const c of commits) {
